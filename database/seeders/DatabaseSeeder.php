@@ -20,11 +20,11 @@ class DatabaseSeeder extends Seeder
         'name' => 'admin',
         'email' => 'admin@admin.com',
         'role_type' => 'Admin',
-        'password' => Hash::make('admin@minizone2025'),
+        'password' => Hash::make('admin@fammilies2025'),
     ]);
 }
 
-if (!\App\Models\User::where('email', 'manager@manager.com')->exists()) {
+if (!\App\Models\User::where('email', 'manager@fammilies2025')->exists()) {
     \App\Models\User::factory()->create([
         'name' => 'manager',
         'email' => 'manager@manager.com',
@@ -42,7 +42,7 @@ if (!\App\Models\User::where('email', 't1@cashier.com')->exists()) {
         'name' => 'cashier',
         'email' => 't1@cashier.com',
         'role_type' => 'Cashier',
-        'password' => Hash::make('cashier@minizone2025'),
+        'password' => Hash::make('cashier@fammilies2025'),
     ]);
 }
 

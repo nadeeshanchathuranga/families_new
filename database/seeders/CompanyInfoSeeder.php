@@ -17,12 +17,12 @@ class CompanyInfoSeeder extends Seeder
         // Insert a record into company_infos table
         DB::table('company_infos')->insert([
             'id' => 1,
-            'name' => 'JAAN Network (Pvt) Ltd.',
-            'address' => 'No 163/B, Kandy Rd, Weliweriya.',
-            'phone' => '0112456789',
-            'phone2' => '0717598064',
-            'email' => 'info@jaannetwork.com',
-            'website' => 'https://jaannetwork.com',
+            'name' => 'Families',
+            'address' => '46,Abdul Hameed Street,Colombo 12.',
+            'phone' => '0750469180',
+            'phone2' => '0776771935',
+            'email' => 'familiesgroup6@gmail.com',
+            'website' => '',
             'logo' => '/images/jaan_logo.jpg',
             'created_at' => now(),
             'updated_at' => now(),

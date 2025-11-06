@@ -255,11 +255,9 @@ const handlePrintReceipt = () => {
   <div class="receipt-container">
     <!-- Header -->
     <div class="header-line">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-        <div style="flex-shrink:0; text-align:right;">
-          <img src="/images/billlogo.png" alt="Company Logo" style="width:60px; height:60px; object-fit:contain;" />
-        </div>
-        <div style="text-align:right; flex-grow:1; padding-left:15px; color:#000;">
+      <div style="display:flex; justify-content:center; align-items:flex-start;">
+    
+        <div style="text-align:center; flex-grow:1; padding-left:15px; color:#000;">
           ${
             companyInfo?.value?.name
               ? `<h1 style="margin:0; font-size:16px; font-weight:bold;">${companyInfo.value.name}</h1>`
