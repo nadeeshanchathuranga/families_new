@@ -448,73 +448,85 @@ const printReceipt = (history) => {
 
   const receipt = `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Receipt</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     @media print { body { margin:0; padding:0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-    body { font-family: Arial, sans-serif; font-size: 12px; color:#000; padding: 10px; font-weight:600;}
-    .header { border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
-    .flex { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
-    .section { margin-top: 10px; border-top: 1px solid #000; padding-top: 8px; }
-    .row { display:flex; justify-content:space-between; gap:8px; margin:6px 0; }
-    table { width:100%; border-collapse:collapse; margin-top:6px; }
-    th, td { padding:6px 4px; border-bottom:1px dashed #bbb; }
-    th { text-align:left; border-bottom:1px solid #000; }
-    .totals .row { margin:4px 0; }
-    .totals .row.total { font-weight:bold; font-size: 14px; }
-    .footer { text-align:center; margin-top: 12px; font-size: 10px; }
+    body { background:#fff; font-size:12px; font-family: Arial, sans-serif; margin:0; padding:10px; color:#000; font-weight:600; }
+    .section { margin-bottom:16px; padding-top:8px; border-top:1px solid #000; }
+    .info-row { display:flex; justify-content:space-between; font-size:12px; margin-top:8px; }
+    .info-row p { margin:0; font-weight:bold; }
+    .info-row small { font-weight:normal; }
+    table { width:100%; font-size:12px; border-collapse:collapse; margin-top:8px; }
+    table th, table td { padding:6px 8px; }
+    table th { text-align:left; border-bottom:1px solid #000; }
+    table td { text-align:right; }
+    table td:first-child { text-align:left; }
+    .totals { border-top:1px solid #000; padding-top:8px; font-size:12px; }
+    .totals div { display:flex; justify-content:space-between; margin-bottom:8px; }
+    .totals div:last-child { font-size:14px; font-weight:bold; }
+    .footer { text-align:center; font-size:10px; margin-top:16px; }
+    .header-line { border-bottom:1px solid #000; padding-bottom:10px; margin-bottom:10px; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="flex">
-      <div style="flex:0 0 auto;">${logoImg}</div>
-      <div style="flex:1 1 auto;text-align:right;">${headerRight}</div>
+  <div class="receipt-container">
+    <!-- Header -->
+    <div class="header-line">
+      <div style="display:flex; justify-content:center; align-items:flex-start;">
+        <div style="text-align:center; flex-grow:1; color:#000;">
+          ${headerRight}
+        </div>
+      </div>
     </div>
-  </div>
 
-  <div class="row">
-    <div><b>Date & Time :</b> ${new Date(history.created_at || Date.now()).toLocaleString()}</div>
-    <div><b>Order No:</b> ${history.order_id || ""}</div>
-  </div>
-  <div class="row">
-    <div><b>Customer:</b> ${history?.customer?.name || ""}</div>
-    <div><b>Cashier:</b> ${history?.user?.name || ""}</div>
-  </div>
-  <div class="row">
-    <div><b>Billing:</b> ${Number(history.is_whole) > 0 ? "Wholesale" : "Retail"}</div>
-    <div><b>Credit Bill:</b> ${Number(history.credit_bill) ? "Yes" : "No"}</div>
-  </div>
+    <!-- Info Section -->
+    <div class="info-row">
+      <p>Date & Time: <small>${new Date(history.created_at || Date.now()).toLocaleString()}</small></p>
+      <p>Order No: <small>${history.order_id || ""}</small></p>
+    </div>
+    <div class="info-row">
+      <p>Customer: <small>${history?.customer?.name || ""}</small></p>
+      <p>Cashier: <small>${history?.user?.name || ""}</small></p>
+    </div>
+    <div class="info-row">
+      <p>Billing: <small>${Number(history.is_whole) > 0 ? "Wholesale" : "Retail"}</small></p>
+      <p>Credit Bill: <small>${Number(history.credit_bill) ? "Yes" : "No"}</small></p>
+    </div>
 
-  <div class="section">
-    <table>
-      <thead>
-        <tr style="border-bottom: 1px solid black;">
-          <th style="text-align: left; padding: 4px;">Items</th>
-          <th style="text-align: center; padding: 4px;">Price × Qty</th>
-          <th style="text-align: right; padding: 4px;">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${productRows}
-      </tbody>
-    </table>
-  </div>
+    <!-- Products Table -->
+    <div class="section">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 4px;">Items</th>
+            <th style="text-align: center; padding: 4px;">Price × Qty</th>
+            <th style="text-align: right; padding: 4px;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${productRows}
+        </tbody>
+      </table>
+    </div>
 
-  <div class="section totals">
-    <div class="row"><span>Sub Total</span><span>${money(gross)} LKR</span></div>
-    <div class="row"><span>Custom Discount</span><span>${history.custom_discount_type === "percent" ? money(custom) + " %" : money(custom) + " LKR"}</span></div>
-    <div class="row total"><span>Total</span><span>${money(finalTotal)} LKR</span></div>
-    <div class="row"><span>Cash</span><span>${money(cash)} LKR</span></div>
-    <div class="row"><span>Balance</span><span>${money(balance)} LKR</span></div>
-  </div>
+    <!-- Totals -->
+    <div class="totals">
+      <div><span>Sub Total</span><span>${money(gross)} LKR</span></div>
+      <div><span>Custom Discount</span><span>${history.custom_discount_type === "percent" ? money(custom) + " %" : money(custom) + " LKR"}</span></div>
+      <div><span>Total</span><span>${money(finalTotal)} LKR</span></div>
+      <div><span>Cash</span><span>${money(cash)} LKR</span></div>
+      <div><span>Balance</span><span>${money(balance)} LKR</span></div>
+    </div>
 
-  <div class="footer">
-         <p>THANK YOU COME AGAIN</p>
-    <p><b>Powered by JAAN Network (Pvt) Ltd.</b></p>
+    <!-- Footer -->
+    <div class="footer">
+      <p>THANK YOU COME AGAIN</p>
+      <p><b>Powered by JAAN Network (Pvt) Ltd.</b></p>
+    </div>
   </div>
 </body>
 </html>
