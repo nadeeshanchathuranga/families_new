@@ -2,25 +2,25 @@
   <Head title="POS" />
 
   <div
-    class="flex flex-col items-center justify-start h-screen  space-y-3 bg-gray-100 md:px-20 px-4 overflow-auto text-[1.06rem] leading-relaxed selection:bg-yellow-200"
+    class="flex flex-col items-center justify-start min-h-screen py-8 space-y-8 bg-gray-100 md:px-20 px-4 overflow-auto"
   >
-    <!-- Logo Section - Outside the box -->
-    <div class="w-full md:w-5/6 flex flex-col items-start pt-4 pb-2 gap-2">
-      <Link href="/dashboard" class="cursor-pointer hover:opacity-80 transition-opacity">
-        <img src="/images/jaan_logo.jpg" alt="JAAN Network" class="h-16 md:h-20 object-contain" />
-      </Link>
+    <!-- Include the Header -->
+    <Header />
+
+    <!-- POS Back Button -->
+    <div class="w-full md:w-5/6">
       <Link 
         href="/dashboard" 
-        class="inline-flex items-center gap-4 px-6 py-3 bg-gray-100 text-gray-900 font-bold text-2xl rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
+        class="inline-flex items-center gap-3 px-4 py-2 bg-white text-gray-900 font-bold text-xl rounded-lg hover:bg-gray-100 transition-colors border-2 border-gray-300 shadow-sm"
       >
-        <div class="flex items-center justify-center w-10 h-10 rounded-full border-2 border-gray-900">
-          <i class="ri-arrow-left-line text-2xl"></i>
+        <div class="flex items-center justify-center w-8 h-8 rounded-full border-2 border-gray-900">
+          <i class="ri-arrow-left-line text-lg"></i>
         </div>
         <span>POS</span>
       </Link>
     </div>
 
-    <div class="w-full md:w-5/6  ">
+    <div class="w-full md:w-5/6">
       <div class="flex flex-col w-full gap-5 md:flex-row">
         <div class="flex w-full p-5 border-2 border-black rounded-2xl bg-white shadow-sm">
           <div class="flex flex-col items-start justify-center w-full md:px-8 px-2 gap-5">
@@ -217,7 +217,9 @@
   <div class="flex flex-col justify-between w-2/3 gap-2">
     <p class="text-xl text-gray-900 font-semibold">
       {{ item.name }}
-      <span v-if="item.unit" class="text-sm text-gray-500">({{ item.unit.name }})</span>
+      <span v-if="item.type === 'Weight Based' && item.unit" class="ml-2 text-sm text-gray-600 font-normal">
+        ({{ item.unit.name }})
+      </span>
     </p>
 
     <div class="flex items-center justify-between w-full">
@@ -901,6 +903,7 @@ import { Head, Link, useForm, router } from "@inertiajs/vue3";
 import { ref, onMounted, computed, watch, onUnmounted, nextTick , onBeforeUnmount } from "vue";
 import axios from "axios";
 
+import Header from "@/Components/custom/Header.vue";
 import PosSuccessModel from "@/Components/custom/PosSuccessModel.vue";
 import AlertModel from "@/Components/custom/AlertModel.vue";
 import CurrencyInput from "@/Components/custom/CurrencyInput.vue";

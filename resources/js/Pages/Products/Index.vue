@@ -430,6 +430,7 @@
          v-model:open="isEditModalOpen"
          :selected-product="selectedProduct"
          :units="props.units || []"
+         :current-page="products.current_page"
          />
       <ProductDuplicateModel
          :categories="allcategories"

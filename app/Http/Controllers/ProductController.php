@@ -566,7 +566,7 @@ public function productVariantStore(Request $request)
                 ]);
             }
 
-            return redirect()->route('products.index')->with('banner', 'Product updated successfully');
+            return back()->with('banner', 'Product updated successfully');
 
         } catch (\Throwable $e) {
 
