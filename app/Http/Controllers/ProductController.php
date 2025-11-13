@@ -506,7 +506,11 @@ public function productVariantStore(Request $request)
                 'discount' => 'nullable|numeric|min:0|max:100',
                 'stock_quantity' => 'required|integer|min:0',
                 'unit_id' => 'nullable|exists:units,id',
-
+                'barcode' => [
+                    'nullable',
+                    'string',
+                    Rule::unique('products', 'barcode')->ignore($product->id)->whereNull('deleted_at'),
+                ],
                 'image' => 'nullable|image|max:2048',
                 'certificate' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
                 'expire_date' => 'nullable|date',
