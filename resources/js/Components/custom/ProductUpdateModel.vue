@@ -809,6 +809,10 @@
        },
        onError: (errors) => {
          console.error("Form submission failed:", errors);
+         // Log each error field for debugging
+         Object.keys(errors).forEach(key => {
+           console.error(`${key}:`, errors[key]);
+         });
        },
      });
    };

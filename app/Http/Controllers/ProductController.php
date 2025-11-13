@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\Size;
 use App\Models\Color;
 use App\Models\Category;
@@ -500,7 +501,7 @@ public function productVariantStore(Request $request)
                 'size_id' => 'nullable|exists:sizes,id',
                 'color_id' => 'nullable|exists:colors,id',
                 'cost_price' => 'required|numeric|min:0',
-                'selling_price' => 'required|numeric|min:0',
+                'selling_price' => 'nullable|numeric|min:0',
                 'discounted_price' => 'nullable|numeric|min:0',
                 'discount' => 'nullable|numeric|min:0|max:100',
                 'stock_quantity' => 'required|integer|min:0',
@@ -517,7 +518,8 @@ public function productVariantStore(Request $request)
                 'final_whole_price' => 'nullable|numeric|min:0',
                 'wholesale_discount' => 'nullable|numeric|min:0|max:100',
                 'code' => 'nullable|max:50',
-                 'type' => ['required', 'in:Normal,Weight Based'],
+                'supplier_id' => 'nullable|exists:suppliers,id',
+                'type' => ['required', 'in:Normal,Weight Based'],
             ]);
 
             // Handle image upload
