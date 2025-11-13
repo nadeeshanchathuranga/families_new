@@ -328,6 +328,8 @@ public function store(Request $request)
 }
 public function productVariantStore(Request $request)
 {
+
+ 
     if (!Gate::allows('hasRole', ['Admin'])) {
         abort(403, 'Unauthorized');
     }
@@ -371,20 +373,11 @@ public function productVariantStore(Request $request)
         'preorder_level_qty' => 'nullable|integer|min:0',
         'purchase_date' => 'nullable|date',
         'batch_no' => 'nullable|string|max:50',
-        'whole_price' => [
-            'nullable',
-            'numeric',
-            'min:0',
-            function ($attribute, $value, $fail) use ($request) {
-                if ($value < $request->input('cost_price')) {
-                    $fail('The selling price must be greater than or equal to the cost price.');
-                }
-            },
-        ],
-        'wholesale_discount' => 'nullable|numeric|min:0|max:100',
-        'final_whole_price' => 'nullable|numeric|min:0',
+        
         'certificate' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
     ]);
+
+      
 
     try {
         // Handle image upload
@@ -427,6 +420,8 @@ public function productVariantStore(Request $request)
 
         return redirect()->route('products.index')->banner('Product created successfully');
     } catch (\Exception $e) {
+
+        dd($e);
         \Log::error('Error creating product: ' . $e->getMessage());
         return redirect()->back()->with('error', 'An error occurred while creating the product. Please try again.');
     }
@@ -511,7 +506,15 @@ public function productVariantStore(Request $request)
                     'string',
                     Rule::unique('products', 'barcode')->ignore($product->id)->whereNull('deleted_at'),
                 ],
-                'image' => 'nullable|image|max:2048',
+               'image' => [
+    'nullable',
+    function ($attribute, $value, $fail) {
+        // Allow if it's a valid file upload or an existing storage path
+        if (!request()->hasFile('image') && !is_string($value)) {
+            $fail('The ' . $attribute . ' field must be an image file or a valid path.');
+        }
+    },
+],
                 'certificate' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
                 'expire_date' => 'nullable|date',
                 'expiry_date_margin' => 'nullable|integer|min:0',
@@ -576,7 +579,7 @@ public function productVariantStore(Request $request)
 
         } catch (\Throwable $e) {
 
-
+ 
             Log::error('Product update failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
