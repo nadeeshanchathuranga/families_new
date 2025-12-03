@@ -13,14 +13,33 @@ class StockTransactionController extends Controller
      * Display a listing of the resource.
      */
 
-     public function index()
+     public function index(Request $request)
      {
-         $allStockTransactions = StockTransaction::with('product.supplier')->orderBy('id', 'desc')->get();
+         $query = StockTransaction::with('product.supplier')->orderBy('id', 'desc');
 
+         // Search functionality
+         if ($request->has('search') && $request->search != '') {
+             $search = $request->search;
+             $query->where(function ($q) use ($search) {
+                 $q->where('transaction_type', 'like', "%{$search}%")
+                   ->orWhere('quantity', 'like', "%{$search}%")
+                   ->orWhere('transaction_date', 'like', "%{$search}%")
+                   ->orWhere('reason', 'like', "%{$search}%")
+                   ->orWhereHas('product', function ($q) use ($search) {
+                       $q->where('name', 'like', "%{$search}%");
+                   })
+                   ->orWhereHas('product.supplier', function ($q) use ($search) {
+                       $q->where('name', 'like', "%{$search}%");
+                   });
+             });
+         }
+
+         $allStockTransactions = $query->get();
 
          return Inertia::render('StockTransaction/Index', [
              'allStockTransactions' => $allStockTransactions,
-             'totalStockTransactions' => $allStockTransactions->count()
+             'totalStockTransactions' => $allStockTransactions->count(),
+             'filters' => $request->only(['search'])
          ]);
      }
 

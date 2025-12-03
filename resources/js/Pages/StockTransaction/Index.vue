@@ -57,18 +57,10 @@
     class="flex flex-col items-center justify-start min-h-screen py-8 space-y-8 bg-gray-100 md:px-36 px-16"
   >
     <Header />
-    <div class="w-full md:w-5/6 py-12 space-y-24">
-      <div class="flex items-center justify-between float-end">
-        <p class="text-3xl italic font-bold text-black">
-          <span class="px-4 py-1 mr-3 text-white bg-black rounded-xl">{{
-            totalStockTransactions
-          }}</span>
-          <span class="text-xl">/ Total Stock Transition</span>
-        </p>
-      </div>
-
-      <div class="flex w-full">
-        <div class="flex items-center w-full h-16 space-x-4 rounded-2xl">
+    <div class="w-full md:w-5/6 py-12 space-y-8">
+      <!-- Title and Search Row -->
+      <div class="flex items-center justify-between w-full">
+        <div class="flex items-center space-x-4">
           <Link href="/">
             <img src="/images/back-arrow.png" class="w-14 h-14" />
           </Link>
@@ -76,7 +68,21 @@
             Stock Transitions
           </p>
         </div>
-        <div class="flex justify-end md:inline hidden w-full"></div>
+        <div class="flex items-center space-x-4">
+          <!-- Search Input -->
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search transactions..."
+            class="px-4 py-2 w-64 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <p class="text-xl italic font-bold text-black whitespace-nowrap">
+            <span class="px-4 py-1 mr-2 text-white bg-black rounded-xl">{{
+              totalStockTransactions
+            }}</span>
+            <span class="text-lg">/ Total Stock Transition</span>
+          </p>
+        </div>
       </div>
       <template v-if="allStockTransactions && allStockTransactions.length > 0">
         <div class="overflow-x-auto">
@@ -191,8 +197,8 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useForm } from "@inertiajs/vue3";
+import { ref, watch } from "vue";
+import { useForm, router } from "@inertiajs/vue3";
 import { Head, Link } from "@inertiajs/vue3";
 import Header from "@/Components/custom/Header.vue";
 import Footer from "@/Components/custom/Footer.vue";
@@ -200,9 +206,32 @@ import StockUpdateModel from "@/Components/custom/StockTransResonModel.vue";
 import Banner from "@/Components/Banner.vue";
 import { HasRole } from "@/Utils/Permissions";
 
-defineProps({
+const props = defineProps({
   allStockTransactions: Array,
   totalStockTransactions: Number,
+  filters: Object,
+});
+
+const searchQuery = ref(props.filters?.search || "");
+let searchTimeout = null;
+
+// Watch for search query changes with debounce
+watch(searchQuery, (value) => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+  }
+  
+  searchTimeout = setTimeout(() => {
+    router.get(
+      route("stock-transition.index"),
+      { search: value },
+      {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+      }
+    );
+  }, 500); // Wait 500ms after user stops typing
 });
 const form = useForm({});
 
