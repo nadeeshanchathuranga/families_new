@@ -416,6 +416,7 @@
             <tr class="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-700 text-white text-[14px] border-b border-blue-800">
               <th class="p-3 text-left font-semibold">#</th>
               <th class="p-3 text-left font-semibold">Product</th>
+              <th class="p-3 text-center font-semibold">Stock Quantity</th>
               <th class="p-3 text-center font-semibold">Sales Qty</th>
               <th class="p-3 text-center font-semibold">Total Sales Value (LKR)</th>
               <th class="p-3 text-center font-semibold">Price (LKR)</th>
@@ -429,6 +430,7 @@
             <tr v-for="(p, i) in products" :key="p.id ?? i" class="border-b transition duration-200 hover:bg-gray-100">
               <td class="p-3 text-center">{{ i + 1 }}</td>
               <td class="p-3 font-bold">{{ p.name || 'N/A' }}</td>
+              <td class="p-3 text-center">{{ Number(p.stock_quantity || 0) }}</td>
               <td class="p-3 text-center">{{ Number(p.sales_qty || 0) }}</td>
               <td class="p-3 text-center">
                 {{ (Number(p.sales_qty || 0) * Number(p.selling_price || 0)).toFixed(2) }}
@@ -446,6 +448,7 @@
           <tfoot class="bg-gray-50 text-[12px]  font-semibold">
             <tr>
               <td class="p-3 text-right" colspan="2">Totals:</td>
+              <td class="p-3 text-right"></td>
               <td class="p-3 text-right">{{ totalSalesQty.toLocaleString() }}</td>
               <td class="p-3 text-right"></td>
               <td class="p-3 text-right"></td>
