@@ -74,6 +74,7 @@ Route::post('/service/submit', [PosController::class, 'serviceSubmit'])
     Route::resource('payment', PaymentController::class);
     Route::resource('reports', ReportController::class);
     Route::get('/batch-management/search', [ReportController::class, 'searchByCode']);
+    Route::get('/reports/stock-summary/pdf', [ReportController::class, 'downloadStockSummaryPdf'])->name('reports.stockSummaryPdf');
     Route::resource('customers', CustomerController::class);
     Route::resource('colors', ColorController::class);
     Route::resource('coupons', CouponController::class);
@@ -108,7 +109,7 @@ Route::resource('units', UnitController::class);
         ->name('CreditPayment.fetch');
     Route::resource('credit_payment', CreditController::class);
 
-Route::resource('users', UserController::class); 
+Route::resource('users', UserController::class);
 
 
 });

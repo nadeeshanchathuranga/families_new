@@ -12,6 +12,7 @@ use DateTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReportController extends Controller
 {
@@ -151,9 +152,59 @@ class ReportController extends Controller
         $stockTransactionsReturn->whereBetween('transaction_date', [$startDateRaw, $endDateRaw]);
     }
 
+    // -------- Inventory Stock Summary --------
+    // Get all products with their sales data
+    $allProducts = Product::with('category')->get();
 
-    
-  
+    // Calculate sold quantities per product within date range
+    $soldQuantitiesQuery = SaleItem::query()
+        ->whereHas('sale', function ($q) use ($applyCreatedWindow, $from, $to) {
+            if ($from || $to) $applyCreatedWindow($q);
+        });
+
+    $soldQuantities = $soldQuantitiesQuery
+        ->select('product_id')
+        ->selectRaw('SUM(quantity) as sold_qty')
+        ->selectRaw('SUM(total_price) as total_sales_value')
+        ->groupBy('product_id')
+        ->get()
+        ->keyBy('product_id');
+
+    // Build stock summary data
+    $stockSummary = $allProducts->map(function ($product) use ($soldQuantities) {
+        $soldData = $soldQuantities->get($product->id);
+        $soldQty = $soldData ? (float) $soldData->sold_qty : 0;
+        $totalSalesValue = $soldData ? (float) $soldData->total_sales_value : 0;
+
+        $stockQty = (float) ($product->stock_quantity ?? 0);
+        $costPrice = (float) ($product->cost_price ?? 0);
+        $sellingPrice = (float) ($product->selling_price ?? 0);
+
+        return [
+            'id' => $product->id,
+            'name' => $product->name,
+            'category' => $product->category->name ?? 'N/A',
+            'available_stock' => $stockQty,
+            'cost_price' => $costPrice,
+            'selling_price' => $sellingPrice,
+            'stock_cost_value' => $stockQty * $costPrice,
+            'stock_selling_value' => $stockQty * $sellingPrice,
+            'sold_qty' => $soldQty,
+            'total_sales_value' => $totalSalesValue,
+        ];
+    });
+
+    // Calculate totals for stock summary
+    $stockSummaryTotals = [
+        'total_products' => $allProducts->count(),
+        'total_available_stock' => $stockSummary->sum('available_stock'),
+        'total_stock_cost_value' => $stockSummary->sum('stock_cost_value'),
+        'total_stock_selling_value' => $stockSummary->sum('stock_selling_value'),
+        'total_sold_qty' => $stockSummary->sum('sold_qty'),
+        'total_sales_value' => $stockSummary->sum('total_sales_value'),
+    ];
+
+
 
     return Inertia::render('Reports/Index', [
         'products'                  => $products,
@@ -177,7 +228,11 @@ class ReportController extends Controller
         'expenses'                  => $expenses,
         'totalExpenseAmount'        => round($totalExpenseAmount, 2),
         'totalExpenseCount'         => $totalExpenseCount,
-         'stockTransactionsReturn'  => $stockTransactionsReturn,
+        'stockTransactionsReturn'   => $stockTransactionsReturn,
+
+        // Stock Summary Data
+        'stockSummary'              => $stockSummary->values(),
+        'stockSummaryTotals'        => $stockSummaryTotals,
     ]);
 }
 
@@ -213,7 +268,9 @@ class ReportController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $totalQuantity = $products->sum('total_quantity');
+        // Prefer current available stock stored in `stock_quantity`.
+        // Do not rely on legacy `total_quantity` field.
+        $totalQuantity = $products->sum('stock_quantity');
         $remainingQuantity = $products->sum('stock_quantity');
 
         return response()->json([
@@ -223,24 +280,102 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Download Stock Summary Report as PDF
+     */
+    public function downloadStockSummaryPdf(Request $request)
+    {
+        if (!Gate::allows('hasRole', ['Admin'])) {
+            abort(403, 'Unauthorized');
+        }
 
+        $startDateRaw = $request->input('start_date');
+        $endDateRaw   = $request->input('end_date');
 
+        $from = $startDateRaw ? Carbon::parse($startDateRaw)->startOfDay() : null;
+        $to   = $endDateRaw   ? Carbon::parse($endDateRaw)->endOfDay()     : null;
 
+        $applyCreatedWindow = function ($q) use ($from, $to) {
+            if ($from && $to) {
+                $q->whereBetween('created_at', [$from, $to]);
+            } elseif ($from) {
+                $q->where('created_at', '>=', $from);
+            } elseif ($to) {
+                $q->where('created_at', '<=', $to);
+            }
+        };
 
+        // Get all products
+        $allProducts = Product::with('category')->get();
 
+        // Calculate sold quantities per product within date range
+        $soldQuantitiesQuery = SaleItem::query()
+            ->whereHas('sale', function ($q) use ($applyCreatedWindow, $from, $to) {
+                if ($from || $to) $applyCreatedWindow($q);
+            });
 
+        $soldQuantities = $soldQuantitiesQuery
+            ->select('product_id')
+            ->selectRaw('SUM(quantity) as sold_qty')
+            ->selectRaw('SUM(total_price) as total_sales_value')
+            ->groupBy('product_id')
+            ->get()
+            ->keyBy('product_id');
 
+        // Build stock summary data
+        $stockSummary = $allProducts->map(function ($product) use ($soldQuantities) {
+            $soldData = $soldQuantities->get($product->id);
+            $soldQty = $soldData ? (float) $soldData->sold_qty : 0;
+            $totalSalesValue = $soldData ? (float) $soldData->total_sales_value : 0;
 
+            $stockQty = (float) ($product->stock_quantity ?? 0);
+            $costPrice = (float) ($product->cost_price ?? 0);
+            $sellingPrice = (float) ($product->selling_price ?? 0);
 
+            return (object) [
+                'id' => $product->id,
+                'name' => $product->name,
+                'category' => $product->category->name ?? 'N/A',
+                'available_stock' => $stockQty,
+                'cost_price' => $costPrice,
+                'selling_price' => $sellingPrice,
+                'stock_cost_value' => $stockQty * $costPrice,
+                'stock_selling_value' => $stockQty * $sellingPrice,
+                'sold_qty' => $soldQty,
+                'total_sales_value' => $totalSalesValue,
+            ];
+        });
 
+        // Calculate totals
+        $totals = (object) [
+            'total_products' => $allProducts->count(),
+            'total_available_stock' => $stockSummary->sum('available_stock'),
+            'total_stock_cost_value' => $stockSummary->sum('stock_cost_value'),
+            'total_stock_selling_value' => $stockSummary->sum('stock_selling_value'),
+            'total_sold_qty' => $stockSummary->sum('sold_qty'),
+            'total_sales_value' => $stockSummary->sum('total_sales_value'),
+        ];
 
+        // Date range label
+        $rangeLabel = 'All Time';
+        if ($startDateRaw && $endDateRaw) {
+            $rangeLabel = Carbon::parse($startDateRaw)->format('Y-m-d') . ' to ' . Carbon::parse($endDateRaw)->format('Y-m-d');
+        } elseif ($startDateRaw) {
+            $rangeLabel = 'From ' . Carbon::parse($startDateRaw)->format('Y-m-d');
+        } elseif ($endDateRaw) {
+            $rangeLabel = 'Until ' . Carbon::parse($endDateRaw)->format('Y-m-d');
+        }
 
+        $pdf = Pdf::loadView('pdf.stock-summary', [
+            'title' => 'Stock Summary Report',
+            'stockSummary' => $stockSummary,
+            'totals' => $totals,
+            'rangeLabel' => $rangeLabel,
+            'generatedAt' => Carbon::now()->format('Y-m-d H:i:s'),
+        ])->setPaper('a4', 'landscape');
 
-
-
-
-
-
+        return $pdf->download('Stock_Summary_Report_' . Carbon::now()->format('Y-m-d') . '.pdf');
+    }
 
     /**
      * Show the form for creating a new resource.

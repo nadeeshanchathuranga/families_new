@@ -536,7 +536,123 @@
       </div>
     </div> <!-- /EXPENSES SECTION -->
 
+    <!-- STOCK SUMMARY SECTION -->
+    <div class="w-full bg-white border-4 border-black rounded-xl p-6 mt-8">
+      <h2 class="text-2xl font-semibold text-slate-700 text-center pb-4">Stock Summary Report</h2>
 
+      <div class="flex justify-between items-center pb-4">
+        <div class="flex gap-4">
+          <button @click="downloadStockSummaryPDFClient"
+                  class="px-4 py-2 text-md font-semibold text-white bg-orange-600 rounded-lg hover:bg-orange-700 shadow-md">
+            Download PDF
+          </button>
+
+        </div>
+
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="py-2 px-4 border-2 border-slate-600 rounded-xl bg-slate-100 shadow-sm text-center">
+            <p class="text-sm font-extrabold text-black uppercase">
+              Total Products:
+              <span class="text-base font-bold">{{ stockSummaryTotals.total_products || 0 }}</span>
+            </p>
+          </div>
+          <div class="py-2 px-4 border-2 border-blue-600 rounded-xl bg-blue-100 shadow-sm text-center">
+            <p class="text-sm font-extrabold text-black uppercase">
+              Available Stock:
+              <span class="text-base font-bold">{{ (stockSummaryTotals.total_available_stock || 0).toLocaleString() }}</span>
+            </p>
+          </div>
+          <div class="py-2 px-4 border-2 border-yellow-600 rounded-xl bg-yellow-100 shadow-sm text-center">
+            <p class="text-sm font-extrabold text-black uppercase">
+              Stock Cost Value:
+              <span class="text-base font-bold">{{ (stockSummaryTotals.total_stock_cost_value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR</span>
+            </p>
+          </div>
+          <div class="py-2 px-4 border-2 border-purple-600 rounded-xl bg-purple-100 shadow-sm text-center">
+            <p class="text-sm font-extrabold text-black uppercase">
+              Stock Value:
+              <span class="text-base font-bold">
+                {{ (stockSummaryTotals.total_stock_selling_value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR
+              </span>
+            </p>
+          </div>
+          <div class="py-2 px-4 border-2 border-green-600 rounded-xl bg-green-100 shadow-sm text-center">
+            <p class="text-sm font-extrabold text-black uppercase">
+              Sold Qty:
+              <span class="text-base font-bold text-green-700">{{ (stockSummaryTotals.total_sold_qty || 0).toLocaleString() }}</span>
+            </p>
+          </div>
+          <div class="py-2 px-4 border-2 border-emerald-600 rounded-xl bg-emerald-100 shadow-sm text-center">
+            <p class="text-sm font-extrabold text-black uppercase">
+              Total Sales:
+              <span class="text-base font-bold text-emerald-700">
+                {{ (stockSummaryTotals.total_sales_value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }} LKR
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto overflow-y-auto max-h-[480px] border rounded-xl mt-2">
+        <table id="stockSummaryTbl" class="w-full text-gray-800 bg-white border border-gray-300 rounded-lg shadow-md">
+          <colgroup>
+            <col style="width:40px" />
+            <col style="width:200px" />
+            <col style="width:120px" />
+            <col style="width:80px" />
+            <col style="width:100px" />
+            <col style="width:100px" />
+            <col style="width:120px" />
+            <col style="width:80px" />
+            <col style="width:120px" />
+          </colgroup>
+
+          <thead class="sticky top-0 z-10">
+            <tr class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-700 text-white text-[14px] border-b border-indigo-800">
+              <th class="p-3 text-center font-semibold" rowspan="2">#</th>
+              <th class="p-3 text-left font-semibold" rowspan="2">Product Name</th>
+              <th class="p-3 text-left font-semibold" rowspan="2">Category</th>
+              <th class="p-3 text-center font-semibold bg-blue-600" colspan="4">Available Stock</th>
+              <th class="p-3 text-center font-semibold bg-green-600" colspan="2">Sold Products</th>
+            </tr>
+            <tr class="text-white text-[12px] border-b border-indigo-800">
+              <th class="p-2 text-right font-semibold bg-blue-500">Qty</th>
+              <th class="p-2 text-right font-semibold bg-blue-500">Cost Price</th>
+              <th class="p-2 text-right font-semibold bg-blue-500">Selling Price</th>
+              <th class="p-2 text-right font-semibold bg-blue-500">Total Value</th>
+              <th class="p-2 text-right font-semibold bg-green-500">Qty</th>
+              <th class="p-2 text-right font-semibold bg-green-500">Total Sales</th>
+            </tr>
+          </thead>
+
+          <tbody class="text-[12px] font-medium">
+            <tr v-for="(item, i) in stockSummary" :key="item.id ?? i" class="border-b transition duration-200 hover:bg-gray-100">
+              <td class="p-3 text-center">{{ i + 1 }}</td>
+              <td class="p-3 font-bold">{{ item.name || 'N/A' }}</td>
+              <td class="p-3">{{ item.category || 'N/A' }}</td>
+              <td class="p-3 text-right">{{ Number(item.available_stock || 0).toLocaleString() }}</td>
+              <td class="p-3 text-right">{{ Number(item.cost_price || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}</td>
+              <td class="p-3 text-right">{{ Number(item.selling_price || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}</td>
+              <td class="p-3 text-right text-blue-600 font-semibold">{{ Number(item.stock_selling_value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}</td>
+              <td class="p-3 text-right text-green-600 font-semibold">{{ Number(item.sold_qty || 0).toLocaleString() }}</td>
+              <td class="p-3 text-right text-green-600 font-semibold">{{ Number(item.total_sales_value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}</td>
+            </tr>
+          </tbody>
+
+          <tfoot class="bg-gray-100 text-[12px] font-bold">
+            <tr>
+              <td class="p-3 text-right" colspan="3">TOTALS:</td>
+              <td class="p-3 text-right">{{ (stockSummaryTotals.total_available_stock || 0).toLocaleString() }}</td>
+              <td class="p-3 text-right">{{ (stockSummaryTotals.total_stock_cost_value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}</td>
+              <td class="p-3 text-right">—</td>
+              <td class="p-3 text-right text-blue-600">{{ (stockSummaryTotals.total_stock_selling_value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}</td>
+              <td class="p-3 text-right text-green-600">{{ (stockSummaryTotals.total_sold_qty || 0).toLocaleString() }}</td>
+              <td class="p-3 text-right text-green-600">{{ (stockSummaryTotals.total_sales_value || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div> <!-- /STOCK SUMMARY SECTION -->
 
 
 <div class="flex md:flex-row flex-col items-center justify-center w-full h-full md:space-x-4 md:space-y-0 space-y-4 ">
@@ -586,7 +702,7 @@
           <th class="p-3 text-center font-semibold">Transaction Date</th>
           <th class="p-3 text-center font-semibold">Quantity</th>
           <th class="p-3 text-center font-semibold">Selling Price</th>
-          <th class="p-3 text-center font-semibold">Total Selling Price</th> 
+          <th class="p-3 text-center font-semibold">Total Selling Price</th>
         </tr>
       </thead>
 
@@ -670,6 +786,8 @@ const props = defineProps({
   totalExpenseAmount: { type: Number, required: true },
   totalExpenseCount: { type: Number, required: true },
     stockTransactionsReturn: { type: Array, default: () => [] },
+    stockSummary: { type: Array, default: () => [] },
+    stockSummaryTotals: { type: Object, default: () => ({}) },
 });
 
 // State
@@ -677,6 +795,8 @@ const startDate = ref(props.startDate);
 const endDate   = ref(props.endDate);
 const products  = ref(props.products);
 const stockTransactionsReturn = ref(props.stockTransactionsReturn);
+const stockSummary = ref(props.stockSummary);
+const stockSummaryTotals = ref(props.stockSummaryTotals);
 const sales     = ref(props.sales);
 
 // NEW — expenses state
@@ -1160,7 +1280,7 @@ const downloadPDFTableReturnTable = () => {
       "Transaction Date": "",
       "Quantity":"",
       "Selling Price":"",
-    
+
     }
   ];
 
@@ -1178,8 +1298,8 @@ const downloadPDFTableReturnTable = () => {
     { wch: 20 }, // Transaction Date
     { wch: 10 }, // Quantity
     { wch: 25 }, // Cost Price
-   
-   
+
+
   ];
   ws['!cols'] = colWidths;
 
@@ -1210,7 +1330,7 @@ const downloadPDFTableReturn = () => {
     "Transaction Date",
     "Quantity",
     "Selling Price",
-    
+
   ];
 
   // Prepare table data
@@ -1220,7 +1340,7 @@ const downloadPDFTableReturn = () => {
     stock.transaction_date || "N/A",
     stock.quantity||0,
     Number(stock.product?.selling_price)|| 0,
-    
+
   ]);
 
   // Calculate total sum of "Total Price"
@@ -1243,13 +1363,116 @@ const downloadPDFTableReturn = () => {
       4: { cellWidth: 25 },  // Cost Price
       5: { cellWidth: 25},  // Selling Price
       6: { cellWidth: 20 },  // Profit
-     
+
     },
     margin: { left: 5, right: 10, top: 20 },
   });
 
   // Save the PDF
   doc.save("Return Items.pdf");
+};
+
+// ===== Stock Summary PDF Download (Server-side) =====
+const downloadStockSummaryPDF = () => {
+  const params = new URLSearchParams();
+  if (startDate.value) params.append('start_date', startDate.value);
+  if (endDate.value) params.append('end_date', endDate.value);
+
+  window.location.href = `/reports/stock-summary/pdf?${params.toString()}`;
+};
+
+// ===== Stock Summary PDF Download (Client-side with jsPDF) =====
+const downloadStockSummaryPDFClient = () => {
+  const doc = new jsPDF("l", "mm", "a4"); // Landscape, A4 size
+  const now = new Date();
+
+  // Helpers
+  const toMoney = (n) =>
+    (Number(n || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Header
+  doc.setFontSize(18);
+  doc.setTextColor(26, 54, 93);
+  doc.text("Stock Summary Report", 14, 15);
+
+  doc.setFontSize(10);
+  doc.setTextColor(85, 85, 85);
+  doc.text(`Date range: ${dateRangeLabel.value} • Generated: ${now.toLocaleString()}`, 14, 22);
+
+  // Summary row
+  doc.setFontSize(9);
+  doc.setTextColor(0, 0, 0);
+  const summaryY = 30;
+  const summaryText = `Total Products: ${stockSummaryTotals.value.total_products || 0} | ` +
+    `Available Stock: ${(stockSummaryTotals.value.total_available_stock || 0).toLocaleString()} | ` +
+    `Stock Value: ${toMoney(stockSummaryTotals.value.total_stock_selling_value)} LKR | ` +
+    `Sold Qty: ${(stockSummaryTotals.value.total_sold_qty || 0).toLocaleString()} | ` +
+    `Total Sales: ${toMoney(stockSummaryTotals.value.total_sales_value)} LKR`;
+  doc.text(summaryText, 14, summaryY);
+
+  // Prepare table data
+  const tableRows = stockSummary.value.map((item, index) => [
+    index + 1,
+    item.name || 'N/A',
+    item.category || 'N/A',
+    Number(item.available_stock || 0).toLocaleString(),
+    toMoney(item.cost_price),
+    toMoney(item.selling_price),
+    toMoney(item.stock_selling_value),
+    Number(item.sold_qty || 0).toLocaleString(),
+    toMoney(item.total_sales_value),
+  ]);
+
+  // Table headers
+  const tableHead = [
+    ["#", "Product Name", "Category", "Stock Qty", "Cost Price", "Selling Price", "Stock Value", "Sold Qty", "Total Sales"]
+  ];
+
+  // Footer totals
+  const tableFoot = [[
+    "",
+    { content: "TOTALS:", styles: { halign: "right", fontStyle: "bold" } },
+    "",
+    { content: (stockSummaryTotals.value.total_available_stock || 0).toLocaleString(), styles: { halign: "right", fontStyle: "bold" } },
+    "—",
+    "—",
+    { content: toMoney(stockSummaryTotals.value.total_stock_selling_value), styles: { halign: "right", fontStyle: "bold" } },
+    { content: (stockSummaryTotals.value.total_sold_qty || 0).toLocaleString(), styles: { halign: "right", fontStyle: "bold" } },
+    { content: toMoney(stockSummaryTotals.value.total_sales_value), styles: { halign: "right", fontStyle: "bold" } },
+  ]];
+
+  doc.autoTable({
+    head: tableHead,
+    body: tableRows,
+    foot: tableFoot,
+    startY: 36,
+    theme: "striped",
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [45, 55, 72], textColor: 255, fontStyle: "bold" },
+    footStyles: { fillColor: [226, 232, 240], textColor: [0, 0, 0] },
+    columnStyles: {
+      0: { cellWidth: 12, halign: "center" },  // #
+      1: { cellWidth: 55 },                     // Product Name
+      2: { cellWidth: 35 },                     // Category
+      3: { cellWidth: 25, halign: "right" },   // Stock Qty
+      4: { cellWidth: 28, halign: "right" },   // Cost Price
+      5: { cellWidth: 28, halign: "right" },   // Selling Price
+      6: { cellWidth: 32, halign: "right" },   // Stock Value
+      7: { cellWidth: 25, halign: "right" },   // Sold Qty
+      8: { cellWidth: 32, halign: "right" },   // Total Sales
+    },
+    margin: { top: 30, left: 8, right: 8 },
+    didParseCell: (data) => {
+      // Color sold columns green
+      if (data.column.index >= 7 && data.section === 'body') {
+        data.cell.styles.textColor = [56, 161, 105];
+      }
+    },
+  });
+
+  // Save the PDF
+  const safe = (s) => String(s).replace(/[^\dA-Za-z-]/g, "_");
+  doc.save(`Stock_Summary_${safe(dateRangeLabel.value)}.pdf`);
 };
 
 // ===== Stock table PDF =====
@@ -1371,6 +1594,26 @@ onMounted(() => {
       language: { search: "" },
     });
   }
+
+  // Stock Summary table
+  const $stockSummary = jq && jq("#stockSummaryTbl");
+  if ($stockSummary && jq.fn.dataTable) {
+    if (jq.fn.dataTable.isDataTable($stockSummary)) $stockSummary.DataTable().destroy();
+    const ds = $stockSummary.DataTable({
+      dom: "Bfrtip",
+      paging: false,
+      buttons: [],
+      columnDefs: [{ targets: 0, searchable: false, orderable: false }],
+      initComplete: function () {
+        const $input = jq("#stockSummaryTbl_filter input");
+        $input.attr("placeholder", "Search products...");
+        $input.on("keypress", function (e) {
+          if (e.which == 13) ds.search(this.value).draw();
+        });
+      },
+      language: { search: "" },
+    });
+  }
 });
 </script>
 
@@ -1379,16 +1622,16 @@ onMounted(() => {
 .dataTables_wrapper .dataTables_paginate {
   display: flex; justify-content: center; align-items: center; margin-top: 20px;
 }
-#salesTbl_filter, #stockQtyTbl_filter, #expenseTbl_filter {
+#salesTbl_filter, #stockQtyTbl_filter, #expenseTbl_filter, #stockSummaryTbl_filter {
   display: flex; justify-content: flex-end; align-items: center; margin-bottom: 16px; float: left;
 }
-#salesTbl_filter label, #stockQtyTbl_filter label, #expenseTbl_filter label { font-size: 17px; color: #000000; display: flex; align-items: center; }
-#salesTbl_filter input[type="search"], #stockQtyTbl_filter input[type="search"], #expenseTbl_filter input[type="search"] {
+#salesTbl_filter label, #stockQtyTbl_filter label, #expenseTbl_filter label, #stockSummaryTbl_filter label { font-size: 17px; color: #000000; display: flex; align-items: center; }
+#salesTbl_filter input[type="search"], #stockQtyTbl_filter input[type="search"], #expenseTbl_filter input[type="search"], #stockSummaryTbl_filter input[type="search"] {
   font-weight: 400; padding: 9px 15px; font-size: 14px; color: #000000cc;
   border: 1px solid rgb(209 213 219); border-radius: 5px; background: #fff;
   outline: none; transition: all 0.5s ease;
 }
-#salesTbl_filter input[type="search"]:focus, #stockQtyTbl_filter input[type="search"]:focus, #expenseTbl_filter input[type="search"]:focus {
+#salesTbl_filter input[type="search"]:focus, #stockQtyTbl_filter input[type="search"]:focus, #expenseTbl_filter input[type="search"]:focus, #stockSummaryTbl_filter input[type="search"]:focus {
   border: 1px solid #4b5563; box-shadow: none;
 }
 .dataTables_wrapper { margin-bottom: 10px; }
