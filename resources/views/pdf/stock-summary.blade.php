@@ -70,7 +70,7 @@
             font-size: 9px;
         }
         table.main-table th {
-            background: linear-gradient(to bottom, #2d3748, #1a202c);
+            background: #1a202c;
             color: white;
             text-align: left;
             font-weight: bold;
@@ -88,9 +88,7 @@
         table.main-table tbody tr:nth-child(even) {
             background: #f7fafc;
         }
-        table.main-table tbody tr:hover {
-            background: #edf2f7;
-        }
+        /* Hover effects are ignored in PDF rendering and can increase DOM complexity */
         table.main-table tfoot td {
             font-weight: bold;
             background: #e2e8f0;
@@ -164,62 +162,83 @@
         </div>
     </div>
 
-    <!-- Main Table -->
-    <table class="main-table">
-        <thead>
-            <tr>
-                <th style="width: 30px;" class="center">#</th>
-                <th style="width: 180px;">Product Name</th>
-                <th style="width: 100px;">Category</th>
-                <th class="center" colspan="4" style="background: #2b6cb0;">
-                    Available Stock
-                </th>
-                <th class="center" colspan="2" style="background: #38a169;">
-                    Sold Products
-                </th>
-            </tr>
-            <tr>
-                <th class="center"></th>
-                <th></th>
-                <th></th>
-                <th class="right" style="width: 60px; background: #3182ce;">Qty</th>
-                <th class="right" style="width: 80px; background: #3182ce;">Cost Price</th>
-                <th class="right" style="width: 80px; background: #3182ce;">Selling Price</th>
-                <th class="right" style="width: 90px; background: #3182ce;">Total Value</th>
-                <th class="right" style="width: 60px; background: #48bb78;">Qty</th>
-                <th class="right" style="width: 90px; background: #48bb78;">Total Sales</th>
-            </tr>
-        </thead>
-        <tbody>
-        @forelse($stockSummary as $i => $item)
-            <tr>
-                <td class="center">{{ $i + 1 }}</td>
-                <td>{{ $item->name }}</td>
-                <td>{{ $item->category }}</td>
-                <td class="right">{{ number_format($item->available_stock) }}</td>
-                <td class="right">{{ number_format($item->cost_price, 2) }}</td>
-                <td class="right">{{ number_format($item->selling_price, 2) }}</td>
-                <td class="right">{{ number_format($item->stock_selling_value, 2) }}</td>
-                <td class="right text-green">{{ number_format($item->sold_qty) }}</td>
-                <td class="right text-green">{{ number_format($item->total_sales_value, 2) }}</td>
-            </tr>
-        @empty
-            <tr>
-                <td colspan="9" class="muted center">No products found.</td>
-            </tr>
-        @endforelse
-        </tbody>
-        <tfoot>
-            <tr>
-                <td colspan="3" class="right"><strong>TOTALS:</strong></td>
-                <td class="right">{{ number_format($totals->total_available_stock) }}</td>
-                <td class="right">—</td>
-                <td class="right">—</td>
-                <td class="right">{{ number_format($totals->total_stock_selling_value, 2) }}</td>
-                <td class="right text-green">{{ number_format($totals->total_sold_qty) }}</td>
-                <td class="right text-green">{{ number_format($totals->total_sales_value, 2) }}</td>
-            </tr>
-        </tfoot>
-    </table>
+    @php
+        // Splitting into multiple smaller tables significantly reduces DOMPDF peak memory usage
+        // (Cellmap is very memory-hungry with huge single tables).
+        $chunks = collect($stockSummary)->chunk(35);
+        $rowOffset = 0;
+    @endphp
+
+    @forelse($chunks as $chunkIndex => $chunk)
+        @if($chunkIndex > 0)
+            <div class="page-break"></div>
+        @endif
+
+        <table class="main-table">
+            <thead>
+                <tr>
+                    <th style="width: 30px;" class="center">#</th>
+                    <th style="width: 180px;">Product Name</th>
+                    <th style="width: 100px;">Category</th>
+                    <th class="center" colspan="4" style="background: #2b6cb0;">
+                        Available Stock
+                    </th>
+                    <th class="center" colspan="2" style="background: #38a169;">
+                        Sold Products
+                    </th>
+                </tr>
+                <tr>
+                    <th class="center"></th>
+                    <th></th>
+                    <th></th>
+                    <th class="right" style="width: 60px; background: #3182ce;">Qty</th>
+                    <th class="right" style="width: 80px; background: #3182ce;">Cost Price</th>
+                    <th class="right" style="width: 80px; background: #3182ce;">Selling Price</th>
+                    <th class="right" style="width: 90px; background: #3182ce;">Total Value</th>
+                    <th class="right" style="width: 60px; background: #48bb78;">Qty</th>
+                    <th class="right" style="width: 90px; background: #48bb78;">Total Sales</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($chunk as $i => $item)
+                    <tr>
+                        <td class="center">{{ $rowOffset + $i + 1 }}</td>
+                        <td>{{ $item->name }}</td>
+                        <td>{{ $item->category }}</td>
+                        <td class="right">{{ number_format($item->available_stock) }}</td>
+                        <td class="right">{{ number_format($item->cost_price, 2) }}</td>
+                        <td class="right">{{ number_format($item->selling_price, 2) }}</td>
+                        <td class="right">{{ number_format($item->stock_selling_value, 2) }}</td>
+                        <td class="right text-green">{{ number_format($item->sold_qty) }}</td>
+                        <td class="right text-green">{{ number_format($item->total_sales_value, 2) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+
+            @if($loop->last)
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="right"><strong>TOTALS:</strong></td>
+                        <td class="right">{{ number_format($totals->total_available_stock) }}</td>
+                        <td class="right">—</td>
+                        <td class="right">—</td>
+                        <td class="right">{{ number_format($totals->total_stock_selling_value, 2) }}</td>
+                        <td class="right text-green">{{ number_format($totals->total_sold_qty) }}</td>
+                        <td class="right text-green">{{ number_format($totals->total_sales_value, 2) }}</td>
+                    </tr>
+                </tfoot>
+            @endif
+        </table>
+
+        @php $rowOffset += $chunk->count(); @endphp
+    @empty
+        <table class="main-table">
+            <tbody>
+                <tr>
+                    <td class="muted center">No products found.</td>
+                </tr>
+            </tbody>
+        </table>
+    @endforelse
 </body>
 </html>

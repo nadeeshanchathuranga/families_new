@@ -10,6 +10,7 @@ use App\Models\SaleItem;
 use App\Models\StockTransaction;
 use DateTime;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -36,42 +37,79 @@ class ReportController extends Controller
     $from = $startDateRaw ? Carbon::parse($startDateRaw)->startOfDay() : null;
     $to   = $endDateRaw   ? Carbon::parse($endDateRaw)->endOfDay()     : null;
 
-    // Reusable created_at window
-    $applyCreatedWindow = function ($q) use ($from, $to) {
+    // Reusable datetime window
+    $applyWindow = function ($q, string $column = 'created_at') use ($from, $to) {
         if ($from && $to) {
-            $q->whereBetween('created_at', [$from, $to]);
+            $q->whereBetween($column, [$from, $to]);
         } elseif ($from) {
-            $q->where('created_at', '>=', $from);
+            $q->where($column, '>=', $from);
         } elseif ($to) {
-            $q->where('created_at', '<=', $to);
+            $q->where($column, '<=', $to);
         }
     };
 
     // -------- Top Products (sold in range via Sale.created_at) --------
-    if ($from || $to) {
-        $productIds = SaleItem::whereHas('sale', function ($q) use ($applyCreatedWindow) {
-                $applyCreatedWindow($q);
-            })
-            ->pluck('product_id')
-            ->unique();
+    $productBaseQuery = Product::query()->select([
+        'id',
+        'name',
+        'stock_quantity',
+        'selling_price',
+        'cost_price',
+        'discount',
+        'created_at',
+    ]);
 
-        $products = Product::whereIn('id', $productIds)
+    if ($from || $to) {
+        $productIds = SaleItem::whereHas('sale', function ($q) use ($applyWindow) {
+                $applyWindow($q, 'created_at');
+            })
+            ->distinct()
+            ->pluck('product_id');
+
+        $products = (clone $productBaseQuery)
+            ->whereIn('id', $productIds)
             ->orderBy('created_at', 'desc')
             ->get();
     } else {
-        $products = Product::orderBy('created_at', 'desc')->get();
+        $products = (clone $productBaseQuery)->orderBy('created_at', 'desc')->get();
     }
 
     // -------- Sales (filter by created_at) --------
-    $salesQuery = Sale::with(['saleItems.product.category', 'employee', 'customer']);
+    $salesQuery = Sale::query()
+        ->select([
+            'id',
+            'sale_date',
+            'order_id',
+            'service_name',
+            'is_service',
+            'customer_id',
+            'employee_id',
+            'payment_method',
+            'total_amount',
+            'total_cost',
+            'discount',
+            'custom_discount',
+            'custom_discount_type',
+            'created_at',
+        ])
+        ->with([
+            'saleItems' => function ($q) {
+                $q->select(['id', 'sale_id', 'product_id', 'quantity', 'total_price']);
+            },
+            'saleItems.product' => function ($q) {
+                $q->select(['id', 'name', 'category_id']);
+            },
+            'employee:id,name',
+            'customer:id,name',
+        ]);
 
     if ($from || $to) {
-        $applyCreatedWindow($salesQuery);
+        $applyWindow($salesQuery, 'created_at');
     }
 
     // For qty per product (respect same window through parent sale)
-    $salesQuantitiesQuery = SaleItem::query()->whereHas('sale', function ($q) use ($applyCreatedWindow, $from, $to) {
-        if ($from || $to) $applyCreatedWindow($q);
+    $salesQuantitiesQuery = SaleItem::query()->whereHas('sale', function ($q) use ($applyWindow, $from, $to) {
+        if ($from || $to) $applyWindow($q, 'created_at');
     });
 
     $salesQuantities = $salesQuantitiesQuery
@@ -97,14 +135,20 @@ class ReportController extends Controller
         return $type === 'percent' ? ($gross * $val / 100.0) : $val;
     };
 
-    // Category totals (from filtered sales)
-    $categorySales = [];
-    foreach ($sales as $sale) {
-        foreach ($sale->saleItems as $item) {
-            $categoryName = $item->product->category->name ?? 'No Category';
-            $categorySales[$categoryName] = ($categorySales[$categoryName] ?? 0) + (float) $item->total_price;
-        }
-    }
+    // Category totals (computed in SQL to avoid holding nested relations in memory)
+    $categorySales = DB::table('sale_items')
+        ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+        ->join('products', 'products.id', '=', 'sale_items.product_id')
+        ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+        ->when($from || $to, function ($q) use ($applyWindow) {
+            $applyWindow($q, 'sales.created_at');
+        })
+        ->selectRaw('COALESCE(categories.name, "No Category") as category_name')
+        ->selectRaw('SUM(sale_items.total_price) as total_sales')
+        ->groupBy('category_name')
+        ->pluck('total_sales', 'category_name')
+        ->map(fn ($v) => (float) $v)
+        ->toArray();
 
     // Payment totals (gross)
     $paymentMethodTotals = $sales->groupBy('payment_method')->map(
@@ -139,64 +183,69 @@ class ReportController extends Controller
     $totalCustomer = (clone $salesQuery)->distinct('customer_id')->count('customer_id');
 
     // -------- Expenses (filter by created_at) --------
-    $expenseQuery = ExpenseNew::query();
+    $expenseQuery = ExpenseNew::query()->select(['id', 'title', 'amount', 'expense_date', 'created_at']);
     if ($from || $to) {
-        $applyCreatedWindow($expenseQuery);
+        $applyWindow($expenseQuery, 'created_at');
     }
     $expenses = $expenseQuery->orderBy('created_at', 'desc')->get();
     $totalExpenseAmount = (float) $expenses->sum('amount');
     $totalExpenseCount  = $expenses->count();
 
-     $stockTransactionsReturn = StockTransaction::with('product')->where('transaction_type','Returned')->get();
-    if ($startDateRaw && $endDateRaw) {
-        $stockTransactionsReturn->whereBetween('transaction_date', [$startDateRaw, $endDateRaw]);
+    $stockTransactionsReturnQuery = StockTransaction::query()
+        ->select(['id', 'product_id', 'transaction_date', 'quantity', 'transaction_type'])
+        ->with(['product:id,name,selling_price'])
+        ->where('transaction_type', 'Returned');
+
+    if ($from || $to) {
+        // transaction_date is usually a DATE; compare against date strings
+        if ($from && $to) {
+            $stockTransactionsReturnQuery->whereBetween('transaction_date', [$from->toDateString(), $to->toDateString()]);
+        } elseif ($from) {
+            $stockTransactionsReturnQuery->where('transaction_date', '>=', $from->toDateString());
+        } elseif ($to) {
+            $stockTransactionsReturnQuery->where('transaction_date', '<=', $to->toDateString());
+        }
     }
 
+    $stockTransactionsReturn = $stockTransactionsReturnQuery
+        ->orderBy('transaction_date', 'desc')
+        ->get();
+
     // -------- Inventory Stock Summary --------
-    // Get all products with their sales data
-    $allProducts = Product::with('category')->get();
+    // Compute stock summary via SQL joins/aggregates to keep memory low.
+    $soldAgg = DB::table('sale_items')
+        ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+        ->when($from || $to, function ($q) use ($applyWindow) {
+            $applyWindow($q, 'sales.created_at');
+        })
+        ->select('sale_items.product_id')
+        ->selectRaw('SUM(sale_items.quantity) as sold_qty')
+        ->selectRaw('SUM(sale_items.total_price) as total_sales_value')
+        ->groupBy('sale_items.product_id');
 
-    // Calculate sold quantities per product within date range
-    $soldQuantitiesQuery = SaleItem::query()
-        ->whereHas('sale', function ($q) use ($applyCreatedWindow, $from, $to) {
-            if ($from || $to) $applyCreatedWindow($q);
-        });
-
-    $soldQuantities = $soldQuantitiesQuery
-        ->select('product_id')
-        ->selectRaw('SUM(quantity) as sold_qty')
-        ->selectRaw('SUM(total_price) as total_sales_value')
-        ->groupBy('product_id')
-        ->get()
-        ->keyBy('product_id');
-
-    // Build stock summary data
-    $stockSummary = $allProducts->map(function ($product) use ($soldQuantities) {
-        $soldData = $soldQuantities->get($product->id);
-        $soldQty = $soldData ? (float) $soldData->sold_qty : 0;
-        $totalSalesValue = $soldData ? (float) $soldData->total_sales_value : 0;
-
-        $stockQty = (float) ($product->stock_quantity ?? 0);
-        $costPrice = (float) ($product->cost_price ?? 0);
-        $sellingPrice = (float) ($product->selling_price ?? 0);
-
-        return [
-            'id' => $product->id,
-            'name' => $product->name,
-            'category' => $product->category->name ?? 'N/A',
-            'available_stock' => $stockQty,
-            'cost_price' => $costPrice,
-            'selling_price' => $sellingPrice,
-            'stock_cost_value' => $stockQty * $costPrice,
-            'stock_selling_value' => $stockQty * $sellingPrice,
-            'sold_qty' => $soldQty,
-            'total_sales_value' => $totalSalesValue,
-        ];
-    });
+    $stockSummary = DB::table('products')
+        ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+        ->leftJoinSub($soldAgg, 'sold', function ($join) {
+            $join->on('products.id', '=', 'sold.product_id');
+        })
+        ->select([
+            'products.id',
+            'products.name',
+            DB::raw('COALESCE(categories.name, "N/A") as category'),
+            DB::raw('COALESCE(products.stock_quantity, 0) as available_stock'),
+            DB::raw('COALESCE(products.cost_price, 0) as cost_price'),
+            DB::raw('COALESCE(products.selling_price, 0) as selling_price'),
+            DB::raw('(COALESCE(products.stock_quantity, 0) * COALESCE(products.cost_price, 0)) as stock_cost_value'),
+            DB::raw('(COALESCE(products.stock_quantity, 0) * COALESCE(products.selling_price, 0)) as stock_selling_value'),
+            DB::raw('COALESCE(sold.sold_qty, 0) as sold_qty'),
+            DB::raw('COALESCE(sold.total_sales_value, 0) as total_sales_value'),
+        ])
+        ->orderBy('products.name')
+        ->get();
 
     // Calculate totals for stock summary
     $stockSummaryTotals = [
-        'total_products' => $allProducts->count(),
+        'total_products' => $stockSummary->count(),
         'total_available_stock' => $stockSummary->sum('available_stock'),
         'total_stock_cost_value' => $stockSummary->sum('stock_cost_value'),
         'total_stock_selling_value' => $stockSummary->sum('stock_selling_value'),
@@ -231,7 +280,7 @@ class ReportController extends Controller
         'stockTransactionsReturn'   => $stockTransactionsReturn,
 
         // Stock Summary Data
-        'stockSummary'              => $stockSummary->values(),
+        'stockSummary'              => $stockSummary,
         'stockSummaryTotals'        => $stockSummaryTotals,
     ]);
 }
@@ -289,66 +338,58 @@ class ReportController extends Controller
             abort(403, 'Unauthorized');
         }
 
+        // DOMPDF can be memory-hungry for large tables; raise only for this action.
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(120);
+
         $startDateRaw = $request->input('start_date');
         $endDateRaw   = $request->input('end_date');
 
         $from = $startDateRaw ? Carbon::parse($startDateRaw)->startOfDay() : null;
         $to   = $endDateRaw   ? Carbon::parse($endDateRaw)->endOfDay()     : null;
 
-        $applyCreatedWindow = function ($q) use ($from, $to) {
+        $applyWindow = function ($q, string $column = 'created_at') use ($from, $to) {
             if ($from && $to) {
-                $q->whereBetween('created_at', [$from, $to]);
+                $q->whereBetween($column, [$from, $to]);
             } elseif ($from) {
-                $q->where('created_at', '>=', $from);
+                $q->where($column, '>=', $from);
             } elseif ($to) {
-                $q->where('created_at', '<=', $to);
+                $q->where($column, '<=', $to);
             }
         };
 
-        // Get all products
-        $allProducts = Product::with('category')->get();
+        $soldAgg = DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->when($from || $to, function ($q) use ($applyWindow) {
+                $applyWindow($q, 'sales.created_at');
+            })
+            ->select('sale_items.product_id')
+            ->selectRaw('SUM(sale_items.quantity) as sold_qty')
+            ->selectRaw('SUM(sale_items.total_price) as total_sales_value')
+            ->groupBy('sale_items.product_id');
 
-        // Calculate sold quantities per product within date range
-        $soldQuantitiesQuery = SaleItem::query()
-            ->whereHas('sale', function ($q) use ($applyCreatedWindow, $from, $to) {
-                if ($from || $to) $applyCreatedWindow($q);
-            });
+        $stockSummary = DB::table('products')
+            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoinSub($soldAgg, 'sold', function ($join) {
+                $join->on('products.id', '=', 'sold.product_id');
+            })
+            ->select([
+                'products.id',
+                'products.name',
+                DB::raw('COALESCE(categories.name, "N/A") as category'),
+                DB::raw('COALESCE(products.stock_quantity, 0) as available_stock'),
+                DB::raw('COALESCE(products.cost_price, 0) as cost_price'),
+                DB::raw('COALESCE(products.selling_price, 0) as selling_price'),
+                DB::raw('(COALESCE(products.stock_quantity, 0) * COALESCE(products.cost_price, 0)) as stock_cost_value'),
+                DB::raw('(COALESCE(products.stock_quantity, 0) * COALESCE(products.selling_price, 0)) as stock_selling_value'),
+                DB::raw('COALESCE(sold.sold_qty, 0) as sold_qty'),
+                DB::raw('COALESCE(sold.total_sales_value, 0) as total_sales_value'),
+            ])
+            ->orderBy('products.name')
+            ->get();
 
-        $soldQuantities = $soldQuantitiesQuery
-            ->select('product_id')
-            ->selectRaw('SUM(quantity) as sold_qty')
-            ->selectRaw('SUM(total_price) as total_sales_value')
-            ->groupBy('product_id')
-            ->get()
-            ->keyBy('product_id');
-
-        // Build stock summary data
-        $stockSummary = $allProducts->map(function ($product) use ($soldQuantities) {
-            $soldData = $soldQuantities->get($product->id);
-            $soldQty = $soldData ? (float) $soldData->sold_qty : 0;
-            $totalSalesValue = $soldData ? (float) $soldData->total_sales_value : 0;
-
-            $stockQty = (float) ($product->stock_quantity ?? 0);
-            $costPrice = (float) ($product->cost_price ?? 0);
-            $sellingPrice = (float) ($product->selling_price ?? 0);
-
-            return (object) [
-                'id' => $product->id,
-                'name' => $product->name,
-                'category' => $product->category->name ?? 'N/A',
-                'available_stock' => $stockQty,
-                'cost_price' => $costPrice,
-                'selling_price' => $sellingPrice,
-                'stock_cost_value' => $stockQty * $costPrice,
-                'stock_selling_value' => $stockQty * $sellingPrice,
-                'sold_qty' => $soldQty,
-                'total_sales_value' => $totalSalesValue,
-            ];
-        });
-
-        // Calculate totals
         $totals = (object) [
-            'total_products' => $allProducts->count(),
+            'total_products' => $stockSummary->count(),
             'total_available_stock' => $stockSummary->sum('available_stock'),
             'total_stock_cost_value' => $stockSummary->sum('stock_cost_value'),
             'total_stock_selling_value' => $stockSummary->sum('stock_selling_value'),

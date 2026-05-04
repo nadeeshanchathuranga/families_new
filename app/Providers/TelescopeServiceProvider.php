@@ -20,8 +20,30 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
         $isLocal = $this->app->environment('local');
 
+        // Reports can return very large Inertia payloads; Telescope recording can push
+        // memory over the limit during termination. Disable recording for these routes.
+        if ($isLocal && !$this->app->runningInConsole()) {
+            try {
+                $path = request()->path();
+                if (str_starts_with($path, 'reports')) {
+                    Telescope::stopRecording();
+                }
+            } catch (\Throwable $e) {
+                // Ignore if request isn't available (e.g., early boot).
+            }
+        }
+
         Telescope::filter(function (IncomingEntry $entry) use ($isLocal) {
-            return $isLocal ||
+            if ($isLocal) {
+                // Extra guard: never store report requests even if recording is re-enabled.
+                if ($entry->type === 'request') {
+                    $uri = (string) data_get($entry->content, 'uri', '');
+                    if (str_contains($uri, '/reports')) return false;
+                }
+                return true;
+            }
+
+            return
                    $entry->isReportableException() ||
                    $entry->isFailedRequest() ||
                    $entry->isFailedJob() ||
